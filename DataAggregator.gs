@@ -44,12 +44,25 @@ function runAggregation() {
   // --- 回答データ解析 ---
   const responseValues = responseSheet.getDataRange().getValues();
   const headers = responseValues[0];
+  // ヘッダー検出を柔軟に変更（部分一致対応）
   const colMap = {
-    timestamp: headers.indexOf('タイムスタンプ'),
-    score: headers.indexOf('スコア'), 
-    name: headers.indexOf('ニックネーム (回答者名)'),
-    rankAllow: headers.indexOf('ランキングへの掲載')
+    timestamp: -1,
+    score: -1, 
+    name: -1,
+    rankAllow: -1
   };
+
+  headers.forEach((h, i) => {
+    const str = String(h).trim();
+    if (str === 'タイムスタンプ') colMap.timestamp = i;
+    else if (str === 'スコア') colMap.score = i;
+    else if (str.includes('ニックネーム') || str.includes('回答者名')) colMap.name = i;
+    else if (str.includes('ランキング') && str.includes('掲載')) colMap.rankAllow = i;
+  });
+
+  // 必須列が見つからない場合のログ出力
+  if (colMap.name === -1) console.warn("警告: 'ニックネーム'列が見つかりません。");
+  if (colMap.rankAllow === -1) console.warn("警告: 'ランキングへの掲載'列が見つかりません。掲載フラグはfalseになります。");
 
   let questionStartIndex = Math.max(
     colMap.timestamp, colMap.score, colMap.name, colMap.rankAllow

@@ -14,6 +14,8 @@ function onOpen() {
     .addItem('🤖 ダミーデータ生成', 'generateDummyData')
     .addItem('🌐 ポータルへ登録', 'showRegisterDialog')
     .addSeparator()
+    .addItem('🛠 初期設定 (トリガー登録)', 'setupTrigger') // ★追加
+    .addSeparator()
     .addItem('⚠️ 設定リセット', 'resetConfig')
     .addToUi();
 }
@@ -21,6 +23,31 @@ function onOpen() {
 // ...(既存のmain関数などはそのまま)...
 
 // --- ファイルの末尾に以下の関数を追加 ---
+
+/** トリガー設定関数: フォーム送信時に集計を実行させる */
+function setupTrigger() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const triggers = ScriptApp.getUserTriggers(ss);
+  const handlerName = 'runAggregation';
+  
+  // 既に登録されているかチェック
+  const isRegistered = triggers.some(t => t.getHandlerFunction() === handlerName);
+  
+  if (!isRegistered) {
+    ScriptApp.newTrigger(handlerName)
+      .forSpreadsheet(ss)
+      .onFormSubmit()
+      .create();
+    const msg = `トリガー設定完了: フォーム送信時に自動集計されます。`;
+    console.log(msg);
+    // UIからの呼び出し時はアラートを出す
+    try { SpreadsheetApp.getUi().alert(msg); } catch(e){}
+  } else {
+    const msg = `トリガーは既に設定されています。`;
+    console.log(msg);
+    try { SpreadsheetApp.getUi().alert(msg); } catch(e){}
+  }
+}
 
 /** 手動で集計を実行するラッパー関数 */
 function forceAggregation() {
@@ -251,6 +278,10 @@ function main() {
       setConfigValue(configSheet, 'Process_Status', 'COMPLETED');
       const publishedUrl = form.getPublishedUrl();
       const editUrl = form.getEditUrl();
+      
+      // ★ここでトリガーを自動設定
+      setupTrigger();
+      
       showUrlDialog(publishedUrl, editUrl);
     } else {
       setConfigValue(configSheet, 'Process_Status', 'SUSPENDED');
