@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+      /* 基本設定 */
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        background: #f3f4f6; 
+        padding: 16px; 
+        color: #1f2937;
+      }
+      .hidden { display: none !important; }
+      
+      /* カード */
+      .card { 
+        background: white; 
+        padding: 16px; 
+        border-radius: 12px; 
+        margin-bottom: 16px; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+      }
+
+      /* 文字サイズ */
+      .text-responsive-lg { font-size: 1.5rem; }
+      
+      /* グリッド */
+      .grid { display: grid; gap: 1rem; }
+      @media (min-width: 768px) { 
+        .md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); } 
+        .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .text-responsive-lg { font-size: 2.25rem; }
+      }
+      
+      /* リストアイテム */
+      .q-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #fafafa; }
+      .q-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; color: white; margin-right: 5px; font-weight: bold; }
+      .bg-red { background-color: #ef4444; }
+      .bg-blue { background-color: #3b82f6; }
+      
+      /* 選択肢 */
+      .choice-list { margin-top: 10px; padding-left: 20px; font-size: 0.95em; color: #4b5563; }
+      .choice-item { list-style-type: decimal; margin-bottom: 4px; }
+      .correct-choice { color: #15803d; font-weight: bold; text-decoration: underline; }
+      
+      /* 解説 */
+      .info-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; margin-bottom: 15px; font-size: 0.85em; color: #1e40af; line-height: 1.6; border-radius: 0 4px 4px 0; }
+      
+      /* 画像 */
+      .q-image { max-width: 100%; height: auto; margin: 10px 0; border: 1px solid #e5e7eb; border-radius: 6px; }
+      
+      /* リンクボタン */
+      .ref-link-btn {
+        display: block;
+        margin-top: 12px;
+        background-color: #f1f5f9;
+        color: #475569;
+        padding: 10px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.9em;
+        font-weight: 600;
+        text-align: center;
+        transition: background 0.2s;
+      }
+      .ref-link-btn:hover { background-color: #e2e8f0; color: #334155; }
+      
+      /* テーブル */
+      .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      table { width: 100%; white-space: nowrap; }
+      th, td { padding: 12px 16px; text-align: left; }
+      
+      #loading { text-align: center; color: #6b7280; margin-top: 50px; }
+      #error-msg { background: #fee2e2; color: #b91c1c; padding: 16px; border-radius: 8px; text-align: center; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div style="max-width: 1000px; margin: 0 auto;">
+      
+      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 flex items-center">
+          <i class="fas fa-chart-pie text-blue-500 mr-2"></i> <?= pageTitle ?>
+        </h1>
+        <button onclick="loadData()" class="w-full md:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow transition">
+          <i class="fas fa-sync-alt mr-2"></i> データ更新
+        </button>
+      </div>
+
+      <div id="error-msg" class="hidden"></div>
+      <div id="loading">
+        <i class="fas fa-spinner fa-spin fa-2x mb-3 text-blue-500"></i><br>
+        データを読み込んでいます...<br>
+        <span class="text-xs">※画像の変換処理があるため時間がかかります</span>
+      </div>
+
+      <div id="dashboard" class="hidden">
+        
+        <div class="grid grid-cols-3 gap-3 md:gap-4 mb-6">
+          <div class="card text-center !mb-0 py-4">
+            <div class="text-xs md:text-sm text-gray-500 mb-1">受験者数</div>
+            <div class="text-responsive-lg font-bold text-gray-800" id="val-users">-</div>
+          </div>
+          <div class="card text-center !mb-0 py-4">
+            <div class="text-xs md:text-sm text-gray-500 mb-1">平均点</div>
+            <div class="text-responsive-lg font-bold text-blue-600" id="val-avg">-</div>
+          </div>
+          <div class="card text-center !mb-0 py-4">
+            <div class="text-xs md:text-sm text-gray-500 mb-1">合格率</div>
+            <div class="text-responsive-lg font-bold text-green-600" id="val-pass">-</div>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="card">
+            <h2 class="font-bold text-red-500 border-b-2 border-red-100 pb-2 mb-4 flex items-center">
+              <i class="fas fa-fire mr-2"></i> 難しかった問題 <span class="text-xs ml-auto text-gray-400">ワースト3</span>
+            </h2>
+            <div id="hard-questions-list"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="font-bold text-blue-500 border-b-2 border-blue-100 pb-2 mb-4 flex items-center">
+              <i class="fas fa-star mr-2"></i> 合否を分けた良問 <span class="text-xs ml-auto text-gray-400">ベスト3</span>
+            </h2>
+            <div class="info-box">
+              <strong><i class="fas fa-info-circle"></i> 識別指数（D.I.）とは？</strong><br>
+              0.4以上なら「実力差が結果に反映された良い問題」です。
+            </div>
+            <div id="good-questions-list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="font-bold text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-trophy text-yellow-500 mr-2"></i> 成績優秀者ランキング
+          </h2>
+          <div class="table-container">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b-2 border-gray-100 text-gray-500 text-sm">
+                <tr>
+                  <th>順位</th>
+                  <th>ニックネーム</th>
+                  <th>得点</th>
+                  <th>合否</th>
+                  <th>日時</th>
+                </tr>
+              </thead>
+              <tbody id="ranking-body" class="text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      window.onload = loadData;
+
+      function loadData() {
+        document.getElementById('error-msg').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('dashboard').classList.add('hidden');
+
+        google.script.run
+          .withSuccessHandler(renderDashboard)
+          .withFailureHandler(showError)
+          .getDashboardData();
+      }
+
+      function renderDashboard(data) {
+        document.getElementById('loading').classList.add('hidden');
+        if (data.status === 'error') { showError(data.message); return; }
+
+        document.getElementById('dashboard').classList.remove('hidden');
+
+        document.getElementById('val-users').textContent = data.summary.totalUsers + "名";
+        document.getElementById('val-avg').textContent = data.summary.avgScore + "点";
+        document.getElementById('val-pass').textContent = data.summary.passRate + "%";
+
+        drawList('hard-questions-list', data.hardQuestions, 'rate');
+        drawList('good-questions-list', data.goodQuestions, 'di');
+        drawRanking(data.users);
+      }
+
+      function drawList(containerId, list, type) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        if (!list || list.length === 0) {
+          container.innerHTML = '<div class="text-center text-gray-400 py-4">データがありません</div>';
+          return;
+        }
+
+        list.forEach((q, index) => {
+          const div = document.createElement('div');
+          div.className = 'q-item';
+          
+          let badgeHtml = '';
+          if (type === 'rate') {
+            badgeHtml = `<span class="q-badge bg-red">正答率 ${(q.rate * 100).toFixed(0)}%</span>`;
+          } else {
+            badgeHtml = `<span class="q-badge bg-blue">識別指数 ${q.di.toFixed(2)}</span>`;
+          }
+
+          let choicesHtml = '<ol class="choice-list">';
+          q.choices.forEach((c, i) => {
+            const isCorrect = ((i + 1) === Number(q.correctVal));
+            const styleClass = isCorrect ? 'correct-choice' : '';
+            const mark = isCorrect ? ' <i class="fas fa-check"></i>' : '';
+            choicesHtml += `<li class="choice-item ${styleClass}">${c}${mark}</li>`;
+          });
+          choicesHtml += '</ol>';
+
+          let imgHtml = '';
+          if (q.base64Img) {
+            imgHtml = `<img src="${q.base64Img}" class="q-image" alt="参考画像">`;
+          }
+
+          let linkHtml = '';
+          if (q.refUrl) {
+            const linkTitle = q.refTitle || "解説ページを見る";
+            linkHtml = `<a href="${q.refUrl}" target="_blank" class="ref-link-btn">
+              <i class="fas fa-external-link-alt mr-1"></i> ${linkTitle}
+            </a>`;
+          }
+
+          div.innerHTML = `
+            <div class="font-bold mb-2 flex items-start">
+              <span class="text-gray-400 mr-2 text-sm">#${index + 1}</span>
+              <div class="flex-1">
+                ${badgeHtml}
+                <span class="text-xs text-gray-500 block mt-1">[${q.id}] ${q.category}</span>
+              </div>
+            </div>
+            <div class="text-sm text-gray-800 leading-relaxed font-medium">${q.text}</div>
+            ${imgHtml}
+            ${choicesHtml}
+            ${linkHtml}
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      // ★修正: 掲載可否の判定ロジックを修正
+      function drawRanking(users) {
+        const tbody = document.getElementById('ranking-body');
+        tbody.innerHTML = '';
+        
+        const sortedUsers = users.sort((a, b) => {
+          if (b[3] !== a[3]) {
+            return b[3] - a[3]; // 得点順
+          }
+          return b[1].localeCompare(a[1]); // 日時順
+        });
+
+        let rank = 1;
+        sortedUsers.forEach(u => {
+          const rankFlag = String(u[7]); // "掲載" or "非掲載"
+          
+          // ▼ 修正ポイント: 「非」が含まれていたら除外、または「掲載」と完全一致
+          // 安全のため「非掲載を含まず、掲載を含む」または「はいで始まる」で判定
+          const isAllowed = 
+             (rankFlag === '掲載') || 
+             (rankFlag.indexOf('非') === -1 && rankFlag.includes('掲載')) ||
+             (rankFlag.startsWith('はい'));
+
+          if(isAllowed) {
+            const tr = document.createElement('tr');
+            tr.className = "border-b border-gray-50 hover:bg-blue-50 transition";
+            
+            const badgeColor = u[6]==='合格' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+            const shortDate = u[1].substring(5); 
+
+            tr.innerHTML = `
+              <td class="font-bold text-gray-600">${rank}</td>
+              <td class="font-medium">${u[2]}</td>
+              <td class="font-bold text-blue-600 text-lg">${u[3]}</td>
+              <td><span class="${badgeColor} px-2 py-1 rounded-full text-xs font-bold">${u[6]}</span></td>
+              <td class="text-gray-400 text-xs">${shortDate}</td>
+            `;
+            tbody.appendChild(tr);
+            rank++;
+          }
+        });
+      }
+
+      function showError(msg) {
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('error-msg').textContent = "エラー: " + msg;
+        document.getElementById('error-msg').classList.remove('hidden');
+      }
+    </script>
+  </body>
+</html>
