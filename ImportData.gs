@@ -1,20 +1,19 @@
 /**
  * 外部の「動物形態機能学」スプレッドシートからデータを読み込み、
- * Google Learn Portal用の「Master」シート形式に整形して追記するスクリプト
+ * Google Learn Portal用の「Master」シート形式（全17列・正答番号対応）に整形して追記するスクリプト
  */
 function importQuizData() {
   // ==========================================
-  // 設定エリア：ここを書き換えてください
+  // 設定エリア
   // ==========================================
   
   // 1. 読み込み元（ソース）のスプレッドシートURL
   const SOURCE_SS_URL = 'https://docs.google.com/spreadsheets/d/xxxxxxxxxxxxxxxxxxxxxxxxxxxxx/edit';
   
-  // 2. 読み込み元のシート名（CSVをインポートしたシートの名前）
-  const SOURCE_SHEET_NAME = '問題集の名前'; 
+  // 2. 読み込み元のシート名
+  const SOURCE_SHEET_NAME = '動物形態機能学・国家試験対策 - 問題集'; 
 
-  // 3. 書き込み先（このGASがあるスプシ）のシート名
-  // ※Google Learn Portalのデフォルトは 'Master' です
+  // 3. 書き込み先のシート名
   const DEST_SHEET_NAME = 'Master'; 
 
   // ==========================================
@@ -35,27 +34,26 @@ function importQuizData() {
     const sourceSS = SpreadsheetApp.openByUrl(SOURCE_SS_URL);
     sourceSheet = sourceSS.getSheetByName(SOURCE_SHEET_NAME);
     if (!sourceSheet) {
-      // シート名が見つからない場合、1番目のシートを使用する（CSVインポート直後などを想定）
-      sourceSheet = sourceSS.getSheets()[0];
+      sourceSheet = sourceSS.getSheets()[0]; // 見つからない場合は1番目のシート
     }
   } catch (e) {
-    Browser.msgBox("エラー: 読み込み元スプレッドシートを開けませんでした。URLと権限を確認してください。\\n" + e.message);
+    Browser.msgBox("エラー: 読み込み元を開けませんでした。\\n" + e.message);
     return;
   }
 
-  // データの読み込み（ヘッダー含む全データ）
   const values = sourceSheet.getDataRange().getValues();
   if (values.length < 2) {
     Browser.msgBox("データがありません。");
     return;
   }
 
-  // ヘッダー行から列インデックスを特定（列の並び順が変わっても対応できるようにする）
+  // ヘッダー行から列インデックスを特定
   const headers = values[0];
   const colMap = {
     question: headers.indexOf('question'),
-    image: headers.indexOf('questionImageURL'),
+    qImage: headers.indexOf('questionImageURL'),
     explanation: headers.indexOf('explanation'),
+    eImage: headers.indexOf('explanationImageURL'), // 解説画像があれば取得
     link: headers.indexOf('Link'),
     trueOpt: headers.indexOf('trueOption'),
     falseOpt: headers.indexOf('falseOption')
@@ -67,64 +65,75 @@ function importQuizData() {
     return;
   }
 
-  // 転記用データの作成
   const newRows = [];
 
   // 2行目からデータ処理開始
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
-    // データを取得
+    // データ取得
     const question = row[colMap.question];
-    const image = colMap.image > -1 ? row[colMap.image] : '';
+    const qImage = colMap.qImage > -1 ? row[colMap.qImage] : '';
     const explanation = colMap.explanation > -1 ? row[colMap.explanation] : '';
+    const eImage = colMap.eImage > -1 ? row[colMap.eImage] : '';
     const link = colMap.link > -1 ? row[colMap.link] : '';
     const trueOption = String(row[colMap.trueOpt]).trim();
     const falseOptionRaw = String(row[colMap.falseOpt]);
 
-    // 不正解選択肢を分割（カンマ区切りに対応）
-    // ※ CSVの状況に合わせて区切り文字を調整しています（カンマまたは読点）
+    // 不正解選択肢を分割
     let falseOptions = falseOptionRaw.split(/,\s*|、\s*/).map(s => s.trim()).filter(s => s !== "");
 
     // 選択肢をマージしてシャッフル
     let allOptions = [trueOption, ...falseOptions];
-    allOptions = shuffleArray_(allOptions);
+    allOptions = shuffleArray_(allOptions); // シャッフル実行
 
-    // Google Learn Portal (Master) の形式に合わせて配列を作成
-    // 想定カラム順: [問題文, 画像URL, 選択肢1, 選択肢2, 選択肢3, 選択肢4, 正解, 解説, 参考URL]
-    // ※プロジェクトによって「選択肢の数」のカラム数が違う場合があるため、最大5つまで対応するようにしています
-    
+    // 正解が何番目（1〜5）に移動したかを探す
+    // indexOfは0始まりなので+1する
+    const correctIndex = allOptions.indexOf(trueOption);
+    const correctNumber = correctIndex + 1;
+
+    // UUID生成 (問題ID用)
+    const uuid = Utilities.getUuid();
+
+    // Masterシートの列順に合わせて配列を作成
+    // 順序: [ID, テキスト, 画像, 選1, 選2, 選3, 選4, 選5, 正答番号, 解説, 解説画像, 参考URL, 参考タイトル, カテゴリ, サブカテ, FormID, ImageID]
     const formattedRow = [
-      question,           // A列: 問題文
-      image,              // B列: 画像URL
-      allOptions[0] || '', // C列: 選択肢1
-      allOptions[1] || '', // D列: 選択肢2
-      allOptions[2] || '', // E列: 選択肢3
-      allOptions[3] || '', // F列: 選択肢4
-      allOptions[4] || '', // G列: 選択肢5（予備）
-      trueOption,         // H列: 正解（テキスト一致判定用）
-      explanation,        // I列: 解説
-      link                // J列: 参考URL
+      uuid,                 // A: 問題ID
+      question,             // B: 問題テキスト
+      qImage,               // C: 問題画像URl
+      allOptions[0] || '',  // D: 選択肢1
+      allOptions[1] || '',  // E: 選択肢2
+      allOptions[2] || '',  // F: 選択肢3
+      allOptions[3] || '',  // G: 選択肢4
+      allOptions[4] || '',  // H: 選択肢5
+      correctNumber,        // I: 正答番号 (数値)
+      explanation,          // J: 解説テキスト
+      eImage,               // K: 解説画像URl
+      link,                 // L: 参考URL
+      '',                   // M: 参考リンクタイトル (空欄)
+      '',                   // N: カテゴリ (空欄)
+      '',                   // O: サブカテゴリ (空欄)
+      '',                   // P: FormItemId (自動処理のため空欄)
+      ''                    // Q: ImageItemId (自動処理のため空欄)
     ];
 
     newRows.push(formattedRow);
   }
 
-  // Masterシートの最終行に追加
+  // Masterシートへ書き込み
   if (newRows.length > 0) {
-    // Masterシートのカラム構造に合わせて書き込み
-    // A列(1)からJ列(10)までと仮定
     const lastRow = destSheet.getLastRow();
-    destSheet.getRange(lastRow + 1, 1, newRows.length, 10).setValues(newRows);
+    // 17列分のデータを書き込む
+    destSheet.getRange(lastRow + 1, 1, newRows.length, 17).setValues(newRows);
     
-    Browser.msgBox("完了: " + newRows.length + " 件のデータをMasterシートに追加しました。");
+    Browser.msgBox("完了: " + newRows.length + " 件のデータを追加しました。");
   } else {
-    Browser.msgBox("追加対象のデータがありませんでした。");
+    Browser.msgBox("データがありませんでした。");
   }
 }
 
 /**
- * 配列をランダムにシャッフルするヘルパー関数 (Fisher-Yates)
+ * 配列をランダムにシャッフルするヘルパー関数
  */
 function shuffleArray_(array) {
   const newArray = array.slice(); 
