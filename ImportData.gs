@@ -8,11 +8,10 @@ function importQuizData() {
   // ==========================================
   
   // 1. 読み込み元（ソース）のスプレッドシートURL
-  // ※「動物形態機能学・国家試験対策」のシートがあるスプレッドシートのURLを貼ってください
   const SOURCE_SS_URL = 'https://docs.google.com/spreadsheets/d/xxxxxxxxxxxxxxxxxxxxxxxxxxxxx/edit';
   
   // 2. 読み込み元のシート名（CSVをインポートしたシートの名前）
-  const SOURCE_SHEET_NAME = '動物形態機能学・国家試験対策 - 問題集'; 
+  const SOURCE_SHEET_NAME = '問題集の名前'; 
 
   // 3. 書き込み先（このGASがあるスプシ）のシート名
   // ※Google Learn Portalのデフォルトは 'Master' です
